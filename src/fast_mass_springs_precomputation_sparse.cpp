@@ -17,12 +17,48 @@ bool fast_mass_springs_precomputation_sparse(
 {
   /////////////////////////////////////////////////////////////////////////////
   // Replace with your code
-  std::vector<Eigen::Triplet<double> > ijv;
-  const int n = V.rows();
-  for(int i = 0;i<n;i++) ijv.emplace_back(i,i,1);
+
+  int n = V.rows();
+  double w = 1e10;
+
+  // output r
+  r.resize(E.rows());
+  Eigen::RowVector3d V1, V2;
+  for (int j = 0; j < E.rows(); ++j) {
+      V1 = V.row(E(j, 0));
+      V2 = V.row(E(j, 1));
+      r[j] = (V1 - V2).norm();
+  }
+
+  // output M
+  M.resize(n, n);
+  std::vector<Eigen::Triplet<double> > tri_M;
+  tri_M.reserve(V.rows());
+  for (int l = 0; l < V.rows(); ++l) {
+      tri_M.emplace_back(l, l, m[l]);
+  }
+  M.setFromTriplets(tri_M.begin(), tri_M.end());
+
+
+  // output A:
+  signed_incidence_matrix_sparse(n, E, A);
+
+  // output C:
+  C.resize(b.rows(), n);
+  std::vector<Eigen::Triplet<double> > tri_C;
+  tri_C.reserve(b.rows());
+  for (int i1 = 0; i1 < b.rows(); ++i1) {
+      tri_C.emplace_back(i1, b(i1), 1);
+  }
+  C.setFromTriplets(tri_C.begin(), tri_C.end());
+
+  Eigen::SparseMatrix<double> W(n, n);
+  W = w * C.transpose() * C;
+
   Eigen::SparseMatrix<double> Q(n,n);
-  Q.setFromTriplets(ijv.begin(),ijv.end());
+  Q = (k * A.transpose() * A) + (M / pow(delta_t, 2)) + W;
   /////////////////////////////////////////////////////////////////////////////
   prefactorization.compute(Q);
+
   return prefactorization.info() != Eigen::NumericalIssue;
 }
